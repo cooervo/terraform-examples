@@ -7,3 +7,4 @@
 # for simplicity in these examples repo let's gitignore the lock files
 # but generally it shouldn't be gitignored
 **/*.lock.hcl
+
