@@ -1,16 +1,16 @@
+variable "availabilityZoneInput" {
+  type = string
+}
+
 locals {
   privateIp = "10.0.1.50"
-  common_tags = {
-    Service = "Client Network"
-    Owner   = "FooBar Labs"
-  }
 }
 
 // 1. Create a VPC
 resource "aws_vpc" "clientVpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
-    Name = "VPC for the client tier"
+    Name = "VPC for the app"
   }
 }
 
@@ -24,7 +24,7 @@ resource "aws_internet_gateway" "clientInternetGateway" {
 resource "aws_subnet" "clientSubnet" {
   cidr_block = "10.0.1.0/24"
   vpc_id = aws_vpc.clientVpc.id
-  availability_zone = "us-east-1a"
+  availability_zone = var.availabilityZoneInput
 
   tags = {
     Name = "Client Subnet"
