@@ -1,3 +1,11 @@
+locals {
+  privateIp = "10.0.1.50"
+  common_tags = {
+    Service = "Client Network"
+    Owner   = "FooBar Labs"
+  }
+}
+
 provider "aws" {
   region = "us-east-1"
 }
@@ -11,32 +19,12 @@ resource "aws_vpc" "clientVpc" {
 }
 
 // 2. Create Internet Gateway
+// Allows communication between your VPC and the public internet.
 resource "aws_internet_gateway" "clientInternetGateway" {
   vpc_id = aws_vpc.clientVpc.id
 }
 
-// 3. Create Custom Route Table
-resource "aws_route_table" "clientRouteTable" {
-  vpc_id = aws_vpc.clientVpc.id
-
-  // IPv4: all IPv4 traffic passes through defined IGateway
-  route {
-    cidr_block = "0.0.0.0/0"
-    gateway_id = aws_internet_gateway.clientInternetGateway.id
-  }
-
-  // IPv6
-  route {
-    ipv6_cidr_block        = "::/0"
-    gateway_id = aws_internet_gateway.clientInternetGateway.id
-  }
-
-  tags = {
-    Name = "Client Route Table"
-  }
-}
-
-// 4. Create a Subnet
+// 3. Create a Subnet
 resource "aws_subnet" "clientSubnet" {
   cidr_block = "10.0.1.0/24"
   vpc_id = aws_vpc.clientVpc.id
@@ -47,7 +35,30 @@ resource "aws_subnet" "clientSubnet" {
   }
 }
 
+// 4. Create Custom Route Table
+// Determines where network traffic from your subnet or gateway is directed.
+resource "aws_route_table" "clientRouteTable" {
+  vpc_id = aws_vpc.clientVpc.id
+
+  // All IPv4 traffic should be directed to through the defined Int.Gateway
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.clientInternetGateway.id
+  }
+
+  // All IPv6 traffic should be directed through the defined Int.Gateway
+  route {
+    ipv6_cidr_block = "::/0"
+    gateway_id = aws_internet_gateway.clientInternetGateway.id
+  }
+
+  tags = {
+    Name = "Client Route Table"
+  }
+}
+
 // 5. Associate Subnet with Route table
+// To make a subnet public add a route in our subnet's route table to an Int.Gateway
 resource "aws_route_table_association" "routeTableAssociation" {
   subnet_id = aws_subnet.clientSubnet.id
   route_table_id = aws_route_table.clientRouteTable.id
@@ -103,7 +114,7 @@ resource "aws_security_group" "securityGroupAllowSshHttpAndHttps" {
 // 7. Create Network Interface with an IP in the subnet created in step 4
 resource "aws_network_interface" "clientNetworkInterface" {
   subnet_id = aws_subnet.clientSubnet.id
-  private_ips     = ["10.0.1.50"]
+  private_ips     = [local.privateIp]
   security_groups = [aws_security_group.securityGroupAllowSshHttpAndHttps.id]
 }
 
@@ -112,7 +123,7 @@ resource "aws_network_interface" "clientNetworkInterface" {
 resource "aws_eip" "clientElasticIP" {
   vpc                       = true
   network_interface         = aws_network_interface.clientNetworkInterface.id
-  associate_with_private_ip = "10.0.1.50" // TODO use local var or input
+  associate_with_private_ip = local.privateIp
   depends_on = [aws_internet_gateway.clientInternetGateway]
 }
 
@@ -133,7 +144,7 @@ resource "aws_instance" "clientServer" {
             sudo apt update -y
             sudo apt install apache2 -y
             sudo systemctl start apache2
-            sudo bash -c 'echo ClientServer running > /var/www/html/index.html'
+            sudo bash -c 'echo ClientServer running on EIP ${aws_eip.clientElasticIP.public_ip} > /var/www/html/index.html'
             EOF
   tags = {
     Name = "Client Server"
