@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 module "db" {
-  source = "./db"
+  source = "db"
   server_names = ["mariaDB", "mySQL", "postgres"]
 }
 

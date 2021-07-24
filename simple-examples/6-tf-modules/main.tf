@@ -3,7 +3,7 @@ provider "aws" {
 }
 
 module "ec2module" {
-  source = "./ec2-module"
+  source = "ec2-module"
   ec2_name = "Example module name"
 }
 
