@@ -5,3 +5,5 @@
 * A serverless app
 * A high availability (multi Availability Zone) app (can be one of the past ones)
 * A replicated MongoDB atlas cloud.
+* Stress test app with ALB.
+* Make a Bastion 
