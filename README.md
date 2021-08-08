@@ -13,7 +13,7 @@ Amount of `Availability Zones` and `Subnets` to deploy the app will be easily de
 
 ![diagram.png](app-load-balancer-ec2/diagram.png)
 
-##### Todo infrastructure ideas:
+#### Todo infrastructure ideas:
 
 - [x] A high availability (multi Availability Zone) app with Auto Scaling Group of EC2 instances.
 - [ ] A 3 tier architecture app: web -> backend -> database
