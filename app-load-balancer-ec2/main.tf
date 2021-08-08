@@ -1,6 +1,6 @@
-/*terraform {
-  required_version = ">= 0.12, < 0.13"
-}*/
+terraform {
+  required_version = "~>1.0.2"
+}
 
 provider "aws" {
   region = "us-east-1"
@@ -8,17 +8,17 @@ provider "aws" {
 
 module "network" {
   source = "./network"
+  subnetsCount = 2
 }
 
 module "loadBalancer" {
   source = "./load-balancer"
 
-  subnetIds = [
-    module.network.publicSubnetAId,
-    module.network.publicSubnetBId
-  ]
-  networkVpcId = module.network.networkVpcId
+  subnetIds = module.network.publicSubnetIds
+  vpcId = module.network.vpcId
+}
 
-  depends_on = [module.network]
+output "albDnsName" {
+  value = module.loadBalancer.albDnsName
 }
 

@@ -1,22 +1,21 @@
 variable "subnetIds" {
-  description = "The subnet IDs to deploy to"
+  description = "The subnet IDs to deploy the load balancer to"
   type        = list(string)
 }
 
-variable "networkVpcId" {
+variable "vpcId" {
   type = string
 }
 
 module "albSecurityGroup" {
   source = "./security-group"
 
-  networkVpcId = var.networkVpcId
+  networkVpcId = var.vpcId
 }
 
 module "launchTemplate" {
   source = "./launch-template"
-
-  sgAllowHttpAndHttpsId = module.albSecurityGroup.allowHttpAndHttpsId
+  secGroupAllowHttpAndHttpsId = module.albSecurityGroup.allowHttpAndHttpsId
 }
 
 resource "aws_alb" "clientLoadBalancer" {
@@ -44,9 +43,10 @@ resource "aws_alb_listener" "albListener" {
       status_code = "404"
     }
   }
+
 }
 
-resource "aws_lb_listener_rule" "asg" {
+resource "aws_lb_listener_rule" "forwardAllToTargetGroupASG" {
   listener_arn = aws_alb_listener.albListener.arn
   priority     = 100
 
@@ -58,17 +58,17 @@ resource "aws_lb_listener_rule" "asg" {
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.asg.arn
+    target_group_arn = aws_lb_target_group.loadBalancerTargetGroup.arn
   }
 }
 
-resource "aws_lb_target_group" "asg" {
+resource "aws_lb_target_group" "loadBalancerTargetGroup" {
 
-  name = aws_alb.clientLoadBalancer.name //TODO
+  name = "loadBalancerTargetGroup"
 
   port     = 80
   protocol = "HTTP"
-  vpc_id   = var.networkVpcId
+  vpc_id   = var.vpcId
 
   health_check {
     path                = "/"
@@ -81,23 +81,15 @@ resource "aws_lb_target_group" "asg" {
   }
 }
 
-// TODO is this needed?
-locals {
-  httpPort = 80
-  anyPort = 0
-  anyProtocol = "-1"
-  tcpProtocol = "tcp"
-  allIps = ["0.0.0.0/0"]
-}
-
-resource "aws_autoscaling_group" "clientASG" {
-  min_size = 1
+resource "aws_autoscaling_group" "appLoadBalancerAsg" {
+  min_size = 2
   desired_capacity = 2
-  max_size = 4
+  max_size = 10
+  vpc_zone_identifier = var.subnetIds
 
   health_check_type = "ELB"
 
-  target_group_arns = [aws_lb_target_group.asg.arn]
+  target_group_arns = [aws_lb_target_group.loadBalancerTargetGroup.arn]
 
   launch_template {
     id = module.launchTemplate.clientServer.id
@@ -113,8 +105,6 @@ resource "aws_autoscaling_group" "clientASG" {
 
   metrics_granularity = "1Minute"
 
-  vpc_zone_identifier = var.subnetIds
-
   // Required to redeploy without an outage.
   lifecycle {
     create_before_destroy = true
@@ -122,64 +112,67 @@ resource "aws_autoscaling_group" "clientASG" {
 
   tag {
     key                 = "Name"
-    value               = "web"
+    value               = "appLoadBalancerAsg"
     propagate_at_launch = true
   }
 }
 
-
-resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_up" {
-  alarm_name = "web_cpu_alarm_up"
-  comparison_operator = "GreaterThanOrEqualToThreshold"
+resource "aws_cloudwatch_metric_alarm" "onCpuOverAlarm" {
+  alarm_name = "onCpuOver60Alarm"
+  alarm_description = "This metric monitors EC2 instance CPU utilization"
   evaluation_periods = "2"
-  metric_name = "CPUUtilization"
-  namespace = "AWS/EC2"
   period = "120"
-  statistic = "Average"
   threshold = "60"
 
+  comparison_operator = "GreaterThanOrEqualToThreshold"
+  metric_name = "CPUUtilization"
+
+  namespace = "AWS/EC2"
+  statistic = "Average"
+
   dimensions = {
-    AutoScalingGroupName = aws_autoscaling_group.clientASG.name
+    AutoScalingGroupName = aws_autoscaling_group.appLoadBalancerAsg.name
   }
 
-  alarm_description = "This metric monitor EC2 instance CPU utilization"
-  alarm_actions = [ aws_autoscaling_policy.web_policy_up.arn ]
+  alarm_actions = [ aws_autoscaling_policy.policyCpuOver.arn ]
 }
 
-resource "aws_autoscaling_policy" "web_policy_up" {
-  name = "web_policy_up"
+resource "aws_autoscaling_policy" "policyCpuOver" {
+  name = "webPolicyUp"
   scaling_adjustment = 1
   adjustment_type = "ChangeInCapacity"
   cooldown = 300
-  autoscaling_group_name = aws_autoscaling_group.clientASG.name
+  autoscaling_group_name = aws_autoscaling_group.appLoadBalancerAsg.name
 }
 
-resource "aws_autoscaling_policy" "web_policy_down" {
-  name = "web_policy_down"
+resource "aws_cloudwatch_metric_alarm" "onCpuUnderAlarm" {
+  alarm_description = "This metric monitors EC2 instance CPU under 10 utilization"
+  alarm_name = "onCpuDownAlarm"
+
+  metric_name = "CPUUtilization"
+  comparison_operator = "LessThanOrEqualToThreshold"
+  threshold = "10"
+
+  evaluation_periods = "2"
+  period = "120"
+  statistic = "Average"
+  namespace = "AWS/EC2"
+
+  dimensions = {
+    AutoScalingGroupName = aws_autoscaling_group.appLoadBalancerAsg.name
+  }
+
+  alarm_actions = [ aws_autoscaling_policy.policyCpuUnder.arn ]
+}
+
+resource "aws_autoscaling_policy" "policyCpuUnder" {
+  name = "policyCpuUnder"
   scaling_adjustment = -1
   adjustment_type = "ChangeInCapacity"
   cooldown = 300
-  autoscaling_group_name = aws_autoscaling_group.clientASG.name
+  autoscaling_group_name = aws_autoscaling_group.appLoadBalancerAsg.name
 }
 
-resource "aws_cloudwatch_metric_alarm" "web_cpu_alarm_down" {
-  alarm_name = "web_cpu_alarm_down"
-  comparison_operator = "LessThanOrEqualToThreshold"
-  evaluation_periods = "2"
-  metric_name = "CPUUtilization"
-  namespace = "AWS/EC2"
-  period = "120"
-  statistic = "Average"
-  threshold = "10"
-
-  dimensions = {
-    AutoScalingGroupName = aws_autoscaling_group.clientASG.name
-  }
-
-  alarm_description = "This metric monitor EC2 instance CPU utilization"
-  alarm_actions = [ aws_autoscaling_policy.web_policy_down.arn ]
-}
-
-output "albDnsName" { // TODO NEEDED?
+output "albDnsName" {
   value = aws_alb.clientLoadBalancer.dns_name
 }
