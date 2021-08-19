@@ -6,8 +6,8 @@ On [Subdir app-load-balancer-ec2/](/app-load-balancer-ec2/) an `Application Load
 Highly Available application. Which uses `Launch Templates` to auto scale `EC2` instances. 
 
 Auto Scaling is triggered by `CloudWatch Events` depending on `CPU` usage:
-* Over 60% CPU usage scales up.
-* Under 10% CPU usage scales up.
+* Over 60% CPU usage, increases instances.
+* Under 10% CPU usage, decreases instances.
 
 Amount of `Availability Zones` and `Subnets` to deploy the app will be easily defined by variable `subnetsCount`.
 
