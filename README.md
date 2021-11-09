@@ -15,10 +15,10 @@ Amount of `Availability Zones` and `Subnets` to deploy the app will be easily de
 
 #### Todo infrastructure ideas:
 
+- [ ] A static website hosted in S3 and available to public.
 - [x] A high availability (multi Availability Zone) app with Auto Scaling Group of EC2 instances.
 - [ ] A 3 tier architecture app: web -> backend -> database
 - [ ] A serverless app
-- [ ] A static website hosted in S3 and available to public.
 - [ ] A replicated MongoDB atlas cloud.
 - [ ] Make a Bastion 
 
