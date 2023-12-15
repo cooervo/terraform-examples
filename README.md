@@ -2,7 +2,7 @@
 
 #### App Load Balancer + Auto Scaling Group example
 
-On [Subdir app-load-balancer-ec2/](/app-load-balancer-ec2/) an `Application Load Balancer` + `Auto Scaling Group` has been used to create a 
+On [Subdir app-load-balancer-ec2/](/2-app-load-balancer-ec2/) an `Application Load Balancer` + `Auto Scaling Group` has been used to create a 
 Highly Available application. Which uses `Launch Templates` to auto scale `EC2` instances. 
 
 Auto Scaling is triggered by `CloudWatch Events` depending on `CPU` usage:
